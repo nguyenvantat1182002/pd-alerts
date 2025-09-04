@@ -95,6 +95,10 @@ class MainWindow(QMainWindow):
         if not self.is_valid_exchange_symbol(symbol):
             return
         
+        items: list[QTableWidgetItem] = self.ui.tableWidget.findItems(symbol, Qt.MatchExactly)
+        if items:
+            return
+        
         timeframes = self.ui.comboBox.currentData()
         if not timeframes:
             return
@@ -196,6 +200,7 @@ class Ui_MainWindow(object):
         __qtablewidgetitem2 = QTableWidgetItem()
         self.tableWidget.setHorizontalHeaderItem(2, __qtablewidgetitem2)
         self.tableWidget.setObjectName(u"tableWidget")
+        self.tableWidget.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.tableWidget.horizontalHeader().setDefaultSectionSize(130)
         self.tableWidget.horizontalHeader().setStretchLastSection(True)
 
