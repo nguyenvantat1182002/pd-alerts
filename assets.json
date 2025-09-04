@@ -2,6 +2,9 @@
     "XAUUSD": ["OANDA"],
     "EURUSD": ["OANDA"],
     "USDCAD": ["OANDA"],
+    "USDCHF": ["OANDA"],
+    "GBPUSD": ["OANDA"],
+    "NAS100USD": ["OANDA"],
     "BTCUSDT.P": ["BINANCE"],
     "ETHUSDT.P": ["BINANCE"]
 }
