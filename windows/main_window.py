@@ -53,7 +53,7 @@ class MainWindow(QMainWindow):
         return True
     
     def get_exchange_symbol(self) -> str:
-        text = self.ui.lineEdit.text()
+        text = self.ui.lineEdit.text().strip()
         parts = text.split(':')
         
         return f'{parts[-1]}:{parts[0]}'
