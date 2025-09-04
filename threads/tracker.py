@@ -1,17 +1,24 @@
+import os
 import traceback
 import pandas as pd
 import talib
 import numpy as np
+import utils
 
 from discord_webhook import DiscordWebhook
-from typing import Callable
 from PyQt5.QtCore import QThread
 from tdv import TradingViewWs
+from history import SignalHistory
 
 
-history: dict[str, pd.Timestamp] = {}
-
-
+def get_webhooks() -> list[str]:
+    file_path = os.path.join(os.getcwd(), 'webhooks.txt')
+    if not os.path.exists(file_path):
+        return []
+    
+    with open(file_path, encoding='utf-8') as file:
+        return file.read().splitlines()
+    
 def supertrend(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 10, multiplier: float = 3.0):
     atr = talib.ATR(high, low, close, timeperiod=period)
     
@@ -48,54 +55,50 @@ def supertrend(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 
 
     return supertrend, direction
 
-
-def handle_candle_update(fetch_webhooks: Callable[[], list[str]], tdv: TradingViewWs, df: pd.DataFrame):
+def handle_candle_update(tdv: TradingViewWs, df: pd.DataFrame):
     df['ST'], df['ST_Direction'] = supertrend(df['high'], df['low'], df['close'])
     df['ST'] = np.round(df['ST'] * tdv.price_scale) / tdv.price_scale
     
     reference_candle = df.iloc[-3]
     base_candle = df.iloc[-2]
-    timeframe_map = {
-        '15': '15m',
-        '30': '30m',
-        '60': '1h',
-        '240': '4h'
-    }
+    
+    timeframe = utils.TIMEFRAME_MAPPING[tdv.interval]
 
-    timeframe = timeframe_map[tdv.interval]
-    content = f'Symbol: {tdv.symbol_id}\nTimeframe: {timeframe}\nMessage: '
+    content = f'Symbol: {tdv.symbol_id}\nTimeframe: {timeframe}\n\n'
     signal_detected = False
     
     if base_candle['ST_Direction'] > -1 and reference_candle['ST_Direction'] < 1:
-        content += 'Price back to P'
+        content += '- Price returns to PREMIUM zone'
         signal_detected = True
     elif base_candle['ST_Direction'] < 1 and reference_candle['ST_Direction'] > -1:
-        content += 'Price back to D'
+        content += '+ Price returns to DISCOUNT zone'
         signal_detected = True
         
+    identify = f'{tdv.symbol_id}_{timeframe}'
+
+    previous_signal_time = SignalHistory.get(identify)
+    if previous_signal_time and previous_signal_time == base_candle['time']:
+        return
+    
     if signal_detected:
-        identify = f'{tdv.symbol_id}_{timeframe}'
-        if identify in history and history[identify] == base_candle['time']:
-            return
+        SignalHistory.update(identify, base_candle['time'])
         
-        history.update({identify: base_candle['time']})
+        webhooks = get_webhooks()
         
-        webhooks = fetch_webhooks()
-        
-        for webhook in webhooks:
+        for url in webhooks:
             try:
-                DiscordWebhook(webhook, content=content).execute()
+                DiscordWebhook(url, content=f'```diff\n{content}\n```').execute()
             except Exception:
                 traceback.print_exc()
             
             QThread.msleep(1000)
-        
+            
+            
 class TrackerThread(QThread):
     def __init__(self):
         super().__init__()
         self.tdv: TradingViewWs = None
-        self.fetch_webhooks: list[str] = lambda: []
         
     def run(self):
-        self.tdv.realtime_bar_chart(300, lambda *args: handle_candle_update(self.fetch_webhooks, *args))
+        self.tdv.realtime_bar_chart(300, handle_candle_update)
         

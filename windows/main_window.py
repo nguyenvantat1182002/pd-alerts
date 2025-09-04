@@ -1,5 +1,6 @@
 import json
 import os
+import utils
 
 from tdv import TradingViewWs
 from threads import TrackerThread
@@ -29,8 +30,7 @@ class MainWindow(QMainWindow):
         self.ui.lineEdit.setCompleter(QCompleter(self.symbols_model, self))
         
         self.ui.pushButton.clicked.connect(self.pushButton_clicked)
-        self.ui.pushButton_2.clicked.connect(self.pushButton_2_clicked)
-
+        
         self.update_watched_files(ASSETS_PATH)
 
         self.tracker = None
@@ -51,15 +51,7 @@ class MainWindow(QMainWindow):
             return False
         
         return True
-
-    def get_webhooks(self) -> list[str]:
-        file_path = self.ui.lineEdit_2.text()
-        if not file_path or (file_path and not os.path.exists(file_path)):
-            return []
-        
-        with open(file_path, encoding='utf-8') as file:
-            return file.read().splitlines()
-        
+    
     def get_exchange_symbol(self) -> str:
         text = self.ui.lineEdit.text()
         parts = text.split(':')
@@ -118,30 +110,17 @@ class MainWindow(QMainWindow):
         self.ui.tableWidget.setItem(row, 1, QTableWidgetItem(self.ui.comboBox.currentText()))
         self.ui.tableWidget.setCellWidget(row, 2, button)
         
-        timeframe_map = {
-            '15m': '15',
-            '30m': '30',
-            '1h': '60',
-            '4h': '240'
-        }
-        
         for timeframe in timeframes:
-            self.tracker = TrackerThread()
-            
-            tdv = TradingViewWs(symbol, timeframe_map[timeframe])
+            tdv = TradingViewWs(symbol, utils.TIMEFRAME_MAPPING[timeframe])
             self.sessions.update({f'{symbol}_{timeframe}': tdv})
-            
+
+            self.tracker = TrackerThread()
             self.tracker.tdv = tdv
-            self.tracker.fetch_webhooks = self.get_webhooks
             
             self.tracker.start()
-
+            
             QThread.msleep(30)
             
-    def pushButton_2_clicked(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, filter='Text Document (*.txt)')
-        self.ui.lineEdit_2.setText(file_path)
-
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -199,34 +178,6 @@ class Ui_MainWindow(object):
 
         self.verticalLayout.addWidget(self.frame_2)
 
-        self.frame_4 = QFrame(self.frame)
-        self.frame_4.setObjectName(u"frame_4")
-        self.frame_4.setMaximumSize(QSize(16777215, 40))
-        self.frame_4.setFrameShape(QFrame.NoFrame)
-        self.frame_4.setFrameShadow(QFrame.Raised)
-        self.horizontalLayout_3 = QHBoxLayout(self.frame_4)
-        self.horizontalLayout_3.setSpacing(5)
-        self.horizontalLayout_3.setObjectName(u"horizontalLayout_3")
-        self.horizontalLayout_3.setContentsMargins(0, 0, 0, 0)
-        self.lineEdit_2 = QLineEdit(self.frame_4)
-        self.lineEdit_2.setObjectName(u"lineEdit_2")
-        self.lineEdit_2.setMinimumSize(QSize(0, 31))
-        self.lineEdit_2.setMaximumSize(QSize(16777215, 31))
-        self.lineEdit_2.setReadOnly(True)
-
-        self.horizontalLayout_3.addWidget(self.lineEdit_2)
-
-        self.pushButton_2 = QPushButton(self.frame_4)
-        self.pushButton_2.setObjectName(u"pushButton_2")
-        self.pushButton_2.setMinimumSize(QSize(100, 31))
-        self.pushButton_2.setMaximumSize(QSize(100, 31))
-        self.pushButton_2.setCursor(QCursor(Qt.PointingHandCursor))
-
-        self.horizontalLayout_3.addWidget(self.pushButton_2)
-
-
-        self.verticalLayout.addWidget(self.frame_4)
-
         self.frame_3 = QFrame(self.frame)
         self.frame_3.setObjectName(u"frame_3")
         self.frame_3.setFrameShape(QFrame.NoFrame)
@@ -245,7 +196,7 @@ class Ui_MainWindow(object):
         __qtablewidgetitem2 = QTableWidgetItem()
         self.tableWidget.setHorizontalHeaderItem(2, __qtablewidgetitem2)
         self.tableWidget.setObjectName(u"tableWidget")
-        self.tableWidget.horizontalHeader().setDefaultSectionSize(150)
+        self.tableWidget.horizontalHeader().setDefaultSectionSize(130)
         self.tableWidget.horizontalHeader().setStretchLastSection(True)
 
         self.horizontalLayout_4.addWidget(self.tableWidget)
@@ -266,16 +217,13 @@ class Ui_MainWindow(object):
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"PD ALERTS", None))
         self.lineEdit.setPlaceholderText(QCoreApplication.translate("MainWindow", u"Symbol", None))
-
+        
         self.comboBox.addItems(['15m', '30m', '1h', '4h'])
         self.comboBox.setCurrentText('15m')
-
+        
         self.pushButton.setText(QCoreApplication.translate("MainWindow", u"Add", None))
-        self.lineEdit_2.setPlaceholderText(QCoreApplication.translate("MainWindow", u"Webhooks", None))
-        self.pushButton_2.setText(QCoreApplication.translate("MainWindow", u"...", None))
         ___qtablewidgetitem = self.tableWidget.horizontalHeaderItem(0)
         ___qtablewidgetitem.setText(QCoreApplication.translate("MainWindow", u"Symbol", None));
         ___qtablewidgetitem1 = self.tableWidget.horizontalHeaderItem(1)
         ___qtablewidgetitem1.setText(QCoreApplication.translate("MainWindow", u"Timeframes", None));
     # retranslateUi
-
