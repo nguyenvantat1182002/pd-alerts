@@ -1,0 +1,7 @@
+{
+    "XAUUSD": ["OANDA"],
+    "EURUSD": ["OANDA"],
+    "USDCAD": ["OANDA"],
+    "BTCUSDT.P": ["BINANCE"],
+    "ETHUSDT.P": ["BINANCE"]
+}
