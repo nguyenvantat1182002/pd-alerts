@@ -4,6 +4,9 @@
     "USDCAD": ["OANDA"],
     "USDCHF": ["OANDA"],
     "GBPUSD": ["OANDA"],
+    "AUDUSD": ["OANDA"],
+    "NZDUSD": ["OANDA"],
+    "USDJPY": ["OANDA"],
     "NAS100USD": ["OANDA"],
     "BTCUSDT.P": ["BINANCE"],
     "ETHUSDT.P": ["BINANCE"]
