@@ -2,7 +2,7 @@ import json
 import os
 import utils
 
-from tdv import TradingViewWs
+from tradingview import TradingViewWs
 from threads import TrackerThread
 from PyQt5.QtCore import (QCoreApplication, QMetaObject, QSize, Qt, QFileSystemWatcher, QThread)
 from PyQt5.QtGui import QCursor, QStandardItemModel, QStandardItem, QCloseEvent
@@ -33,9 +33,10 @@ class MainWindow(QMainWindow):
         
         self.update_watched_files(ASSETS_PATH)
 
-        self.tracker = None
         self.sessions: dict[str, TradingViewWs] = {}
-
+        self.tracker = TrackerThread()
+        self.tracker.start()
+        
     def is_valid_exchange_symbol(self, symbol: str) -> bool:
         exchange, symbol = symbol.split(":")
         if not exchange or not symbol:
@@ -70,26 +71,27 @@ class MainWindow(QMainWindow):
 
     def remove_button_clicked(self):
         row = self.ui.tableWidget.currentRow()
+
         symbol = self.ui.tableWidget.item(row, 0).text()
+        
         timeframes = self.ui.tableWidget.item(row, 1).text()
         timeframes = timeframes.split(',')
-
+        
         for timeframe in timeframes:
             timeframe = timeframe.strip()
-            ws = self.sessions[f'{symbol}_{timeframe}'].ws
+            identify = f'{symbol}_{timeframe}'
 
-            if ws is not None:
-                ws.close()
-                
+            session = self.sessions[identify]
+            session.close()
+            
+            self.sessions.pop(identify)
+            
         self.ui.tableWidget.removeRow(row)
         
     def closeEvent(self, _: QCloseEvent):
-        for _, v in self.sessions.items():
-            ws = v.ws
-
-            if ws is not None:
-                ws.close()
-                
+        for _, session in self.sessions.items():
+            session.close()
+            
     def pushButton_clicked(self):
         symbol = self.get_exchange_symbol()
         if not self.is_valid_exchange_symbol(symbol):
@@ -115,17 +117,13 @@ class MainWindow(QMainWindow):
         self.ui.tableWidget.setCellWidget(row, 2, button)
         
         for timeframe in timeframes:
-            tdv = TradingViewWs(symbol, utils.TIMEFRAME_MAPPING[timeframe])
-            self.sessions.update({f'{symbol}_{timeframe}': tdv})
-
-            self.tracker = TrackerThread()
-            self.tracker.tdv = tdv
+            session = TradingViewWs(symbol, utils.TIMEFRAME_MAPPING[timeframe])
             
-            self.tracker.start()
+            self.sessions.update({f'{symbol}_{timeframe}': session})
+            self.tracker.sessions.put_nowait(session)
             
             QThread.msleep(30)
             
-
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         if MainWindow.objectName():

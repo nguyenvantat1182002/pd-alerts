@@ -1,13 +1,14 @@
-from collections import OrderedDict
-from typing import List, Union, Callable, Self
-from websocket import WebSocketApp
-
+import traceback
 import time
 import json
 import random
 import string
 import re
 import pandas as pd
+
+from collections import OrderedDict
+from typing import List, Union, Callable, Self
+from websocket import WebSocketApp
 
 
 class TradingViewWs():
@@ -18,6 +19,9 @@ class TradingViewWs():
         self.candles: OrderedDict[float, List[float]] = OrderedDict()
         self.price_scale = 0
         self.ws = None
+
+    def close(self):
+        self.ws.close()
         
     def generate_session(self, type: str) -> str:
         string_length = 12
@@ -51,11 +55,13 @@ class TradingViewWs():
             self.send_message(ws, "set_future_tickmarks_mode", [chart_session, "full_single_session"])
             
         def on_close(ws: WebSocketApp, close_status_code: int, close_msg: str):
+            print(self.symbol_id, self.interval, close_status_code, close_msg)
+            
             if close_status_code is None:
-                self.ws = None
                 return
             
             time.sleep(5)
+            
             self.realtime_bar_chart(total_candle, callback)
             
         def on_message(ws: WebSocketApp, message: str):
@@ -86,12 +92,12 @@ class TradingViewWs():
             df['time'] = pd.to_datetime(df['time'], unit='s', utc=True).dt.tz_convert(self.timezone)
             df['time'] = df['time'].dt.tz_localize(None)
             
-            callback(self, df)
+            callback(df)
 
         def on_error(ws: WebSocketApp, error: Exception):
-            print(error)
-            print('ERROR')
+            print('Error', error)
             
+
         self.ws = WebSocketApp('wss://data.tradingview.com/socket.io/websocket',
                                header={"Origin": "https://data.tradingview.com"},
                                on_message=on_message,

@@ -1,3 +1,4 @@
+import queue
 import os
 import traceback
 import pandas as pd
@@ -6,9 +7,8 @@ import numpy as np
 import utils
 
 from discord_webhook import DiscordWebhook
-from PyQt5.QtCore import QThread
-from tdv import TradingViewWs
-from history import SignalHistory
+from PyQt5.QtCore import QThread, QRunnable, QThreadPool, QMutex, QMutexLocker
+from tradingview import TradingViewWs
 
 
 def get_webhooks() -> list[str]:
@@ -55,50 +55,72 @@ def supertrend(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 
 
     return supertrend, direction
 
-def handle_candle_update(tdv: TradingViewWs, df: pd.DataFrame):
-    df['ST'], df['ST_Direction'] = supertrend(df['high'], df['low'], df['close'])
-    df['ST'] = np.round(df['ST'] * tdv.price_scale) / tdv.price_scale
-    
-    reference_candle = df.iloc[-3]
-    base_candle = df.iloc[-2]
-    
-    timeframe = utils.TIMEFRAME_MAPPING[tdv.interval]
 
-    content = f'Symbol: {tdv.symbol_id}\nTimeframe: {timeframe}\n\n'
-    signal_detected = False
-    
-    if base_candle['ST_Direction'] > -1 and reference_candle['ST_Direction'] < 1:
-        content += '- Price returns to PREMIUM zone'
-        signal_detected = True
-    elif base_candle['ST_Direction'] < 1 and reference_candle['ST_Direction'] > -1:
-        content += '+ Price returns to DISCOUNT zone'
-        signal_detected = True
-        
-    identify = f'{tdv.symbol_id}_{timeframe}'
-
-    previous_signal_time = SignalHistory.get(identify)
-    if previous_signal_time and previous_signal_time == base_candle['time']:
-        return
-    
-    if signal_detected:
-        SignalHistory.update(identify, base_candle['time'])
-        
-        webhooks = get_webhooks()
-        
-        for url in webhooks:
-            try:
-                DiscordWebhook(url, content=f'```diff\n{content}\n```').execute()
-            except Exception:
-                traceback.print_exc()
-            
-            QThread.msleep(1000)
-            
-            
 class TrackerThread(QThread):
     def __init__(self):
         super().__init__()
-        self.tdv: TradingViewWs = None
+        self.sessions: queue.Queue[TradingViewWs] = queue.Queue()
+        self.mutex = QMutex()
+        self.history: dict[str, pd.Timestamp] = {}
+        self.pool = QThreadPool()
+        self.pool.setMaxThreadCount(999)
         
     def run(self):
-        self.tdv.realtime_bar_chart(300, handle_candle_update)
+        while 1:
+            try:
+                if self.sessions.empty():
+                    continue
+
+                session = self.sessions.get_nowait()
+                self.pool.start(TrackerRunnable(self, session))
+            finally:
+                QThread.msleep(1000)
+                
+class TrackerRunnable(QRunnable):
+    def __init__(self, parent: TrackerThread, session: TradingViewWs):
+        super().__init__()
+        self.parent = parent
+        self.session = session
+
+    def handle_candle_update(self, df: pd.DataFrame):
+        df['ST'], df['ST_Direction'] = supertrend(df['high'], df['low'], df['close'])
+        df['ST'] = np.round(df['ST'] * self.session.price_scale) / self.session.price_scale
+        
+        reference_candle = df.iloc[-3]
+        base_candle = df.iloc[-2]
+        
+        timeframe = utils.TIMEFRAME_MAPPING[self.session.interval]
+
+        content = f'Symbol: {self.session.symbol_id}\nTimeframe: {timeframe}\n\n'
+        signal_detected = False
+        
+        if base_candle['ST_Direction'] > -1 and reference_candle['ST_Direction'] < 1:
+            content += '- Price returns to PREMIUM zone'
+            signal_detected = True
+        elif base_candle['ST_Direction'] < 1 and reference_candle['ST_Direction'] > -1:
+            content += '+ Price returns to DISCOUNT zone'
+            signal_detected = True
+            
+        identify = f'{self.session.symbol_id}_{timeframe}'
+
+        previous_signal_time = self.parent.history.get(identify)
+        if previous_signal_time and previous_signal_time == base_candle['time']:
+            return
+        
+        if signal_detected:
+            with QMutexLocker(self.parent.mutex):
+                self.parent.history.update({identify: base_candle['time']})
+                
+            webhooks = get_webhooks()
+            
+            for url in webhooks:
+                try:
+                    DiscordWebhook(url, content=f'```diff\n{content}\n```').execute()
+                except Exception:
+                    traceback.print_exc()
+                
+                QThread.msleep(1000)
+
+    def run(self):
+        self.session.realtime_bar_chart(300, self.handle_candle_update)
         
