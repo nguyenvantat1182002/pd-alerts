@@ -3,12 +3,14 @@ import os
 import traceback
 import pandas as pd
 import talib
-import numpy as np
 import utils
 
+from collections import defaultdict
 from discord_webhook import DiscordWebhook
 from PyQt5.QtCore import QThread, QRunnable, QThreadPool, QMutex, QMutexLocker
 from tradingview import TradingViewWs
+
+from .plan import PDZonePlan, RejectionPlan, BasePlan
 
 
 def get_webhooks() -> list[str]:
@@ -61,7 +63,7 @@ class TrackerThread(QThread):
         super().__init__()
         self.sessions: queue.Queue[TradingViewWs] = queue.Queue()
         self.mutex = QMutex()
-        self.history: dict[str, pd.Timestamp] = {}
+        self.history: dict[str, dict[str, pd.Timestamp]] = defaultdict(lambda: defaultdict(lambda: None))
         self.pool = QThreadPool()
         self.pool.setMaxThreadCount(999)
         
@@ -83,33 +85,31 @@ class TrackerRunnable(QRunnable):
         self.session = session
 
     def handle_candle_update(self, df: pd.DataFrame):
-        df['ST'], df['ST_Direction'] = supertrend(df['high'], df['low'], df['close'])
-        df['ST'] = np.round(df['ST'] * self.session.price_scale) / self.session.price_scale
+        plans: list[BasePlan] = [PDZonePlan(self.session, df), RejectionPlan(self.session, df)]
         
-        reference_candle = df.iloc[-3]
-        base_candle = df.iloc[-2]
-        
-        timeframe = utils.TIMEFRAME_MAPPING[self.session.interval]
-
-        content = f'Symbol: {self.session.symbol_id}\nTimeframe: {timeframe}\n\n'
-        signal_detected = False
-        
-        if base_candle['ST_Direction'] > -1 and reference_candle['ST_Direction'] < 1:
-            content += '- Price returns to PREMIUM zone'
-            signal_detected = True
-        elif base_candle['ST_Direction'] < 1 and reference_candle['ST_Direction'] > -1:
-            content += '+ Price returns to DISCOUNT zone'
-            signal_detected = True
+        for plan in plans:
+            if self.session.interval in ['15', '30'] and isinstance(plan, RejectionPlan):
+                continue
             
-        identify = f'{self.session.symbol_id}_{timeframe}'
-
-        previous_signal_time = self.parent.history.get(identify)
-        if previous_signal_time and previous_signal_time == base_candle['time']:
-            return
-        
-        if signal_detected:
+            result = plan.get_result()
+            if not result.result:
+                continue
+            
+            zone_mapping = {
+                -1: f'- {result.message}',
+                1: f'+ {result.message}'
+            }
+            
+            timeframe = utils.TIMEFRAME_MAPPING[self.session.interval]
+            identify = f'{self.session.symbol_id}_{timeframe}'
+            content = f'Symbol: {self.session.symbol_id}\nTimeframe: {timeframe}\n\n{zone_mapping[result.zone]}'
+            
+            previous_signal_time = self.parent.history[identify][plan.name]
+            if previous_signal_time and previous_signal_time == result.base_candle['time']:
+                continue
+            
             with QMutexLocker(self.parent.mutex):
-                self.parent.history.update({identify: base_candle['time']})
+                self.parent.history.update({identify: {plan.name: result.base_candle['time']}})
                 
             webhooks = get_webhooks()
             

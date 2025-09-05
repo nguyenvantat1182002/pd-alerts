@@ -11,9 +11,6 @@ from PyQt5.QtWidgets import *
 from .widgets import CheckableComboBox
 
 
-ASSETS_PATH = os.path.join(os.getcwd(), 'assets.json')
-
-
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -24,15 +21,15 @@ class MainWindow(QMainWindow):
         self.symbols_model  = QStandardItemModel()
 
         self.file_watcher = QFileSystemWatcher()
-        self.file_watcher.addPath(ASSETS_PATH)
+        self.file_watcher.addPath(utils.ASSETS_PATH)
         self.file_watcher.fileChanged.connect(self.update_watched_files)
 
         self.ui.lineEdit.setCompleter(QCompleter(self.symbols_model, self))
         
         self.ui.pushButton.clicked.connect(self.pushButton_clicked)
         
-        self.update_watched_files(ASSETS_PATH)
-
+        self.update_watched_files()
+        
         self.sessions: dict[str, TradingViewWs] = {}
         self.tracker = TrackerThread()
         self.tracker.start()
@@ -42,13 +39,8 @@ class MainWindow(QMainWindow):
         if not exchange or not symbol:
             return False
         
-        with open(ASSETS_PATH, encoding='utf-8') as file:
-            assets: dict = json.load(file)
-
-        if not symbol in assets:
-            return False
-        
-        if not exchange in assets[symbol]:
+        asset = utils.Asset.get(symbol)
+        if not asset or (asset and not exchange in asset.exchanges):
             return False
         
         return True
@@ -59,16 +51,16 @@ class MainWindow(QMainWindow):
         
         return f'{parts[-1]}:{parts[0]}'
     
-    def update_watched_files(self, path: str):
-        with open(path, encoding='utf-8') as file:
-            assets: dict = json.load(file)
-
-        self.symbols_model.clear()
+    def update_watched_files(self):
+        if self.symbols_model.rowCount() > 0:
+            self.symbols_model.clear()
+            
+        assets = utils.Asset.read()
         
         for k, v in assets.items():
-            for exchange in v:
+            for exchange in v.exchanges:
                 self.symbols_model.appendRow(QStandardItem(f'{k}:{exchange}'))
-
+                
     def remove_button_clicked(self):
         row = self.ui.tableWidget.currentRow()
 

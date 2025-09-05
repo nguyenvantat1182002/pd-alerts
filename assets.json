@@ -1,13 +1,57 @@
 {
-    "XAUUSD": ["OANDA"],
-    "EURUSD": ["OANDA"],
-    "USDCAD": ["OANDA"],
-    "USDCHF": ["OANDA"],
-    "GBPUSD": ["OANDA"],
-    "AUDUSD": ["OANDA"],
-    "NZDUSD": ["OANDA"],
-    "USDJPY": ["OANDA"],
-    "NAS100USD": ["OANDA"],
-    "BTCUSDT.P": ["BINANCE"],
-    "ETHUSDT.P": ["BINANCE"]
+    "XAUUSD": {
+        "exchanges": ["OANDA"],
+        "market_open": "4h"
+        
+    },
+    "EURUSD": {
+        "exchanges": ["OANDA"],
+        "market_open": "4h"
+        
+    },
+    "USDCAD": {
+        "exchanges": ["OANDA"],
+        "market_open": "4h"
+        
+    },
+    "USDCHF": {
+        "exchanges": ["OANDA"],
+        "market_open": "4h"
+        
+    },
+    "GBPUSD": {
+        "exchanges": ["OANDA"],
+        "market_open": "4h"
+        
+    },
+    "AUDUSD": {
+        "exchanges": ["OANDA"],
+        "market_open": "4h"
+        
+    },
+    "NZDUSD": {
+        "exchanges": ["OANDA"],
+        "market_open": "4h"
+        
+    },
+    "USDJPY": {
+        "exchanges": ["OANDA"],
+        "market_open": "4h"
+        
+    },
+    "NAS100USD": {
+        "exchanges": ["OANDA"],
+        "market_open": "4h"
+        
+    },
+    "BTCUSDT.P": {
+        "exchanges": ["BINANCE"],
+        "market_open": "7h"
+        
+    },
+    "ETHUSDT.P": {
+        "exchanges": ["BINANCE"],
+        "market_open": "7h"
+        
+    }
 }
