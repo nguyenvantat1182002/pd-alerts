@@ -99,7 +99,7 @@ class RejectionPlan(BasePlan):
         _, symbol = self.session.symbol_id.split(':')
         asset = utils.Asset.get(symbol)
         
-        current_candle = self.df.iloc[-2]
+        current_candle = self.df.iloc[-1]
         freq_mapping = {
             '60': ['4h', 'D', 'W'],
             '240': ['D', 'W'],

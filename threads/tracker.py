@@ -74,6 +74,7 @@ class TrackerThread(QThread):
                     continue
 
                 session = self.sessions.get_nowait()
+                
                 self.pool.start(TrackerRunnable(self, session))
             finally:
                 QThread.msleep(1000)
