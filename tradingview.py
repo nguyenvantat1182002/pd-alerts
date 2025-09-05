@@ -18,8 +18,10 @@ class TradingViewWs():
         self.candles: OrderedDict[float, List[float]] = OrderedDict()
         self.price_scale = 0
         self.ws = None
+        self.stop = False
 
     def close(self):
+        self.stop = True
         self.ws.close()
         
     def generate_session(self, type: str) -> str:
@@ -56,7 +58,7 @@ class TradingViewWs():
         def on_close(ws: WebSocketApp, close_status_code: int, close_msg: str):
             print(self.symbol_id, self.interval, close_status_code, close_msg)
             
-            if close_status_code is None:
+            if self.stop:
                 return
             
             time.sleep(5)
