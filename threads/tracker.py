@@ -86,7 +86,7 @@ class TrackerRunnable(QRunnable):
         self.session = session
 
     def handle_candle_update(self, df: pd.DataFrame):
-        plans: list[BasePlan] = [PDZonePlan(self.session, df), RejectionPlan(self.session, df)]
+        plans: list[BasePlan] = [RejectionPlan(self.session, df), PDZonePlan(self.session, df)]
         
         for plan in plans:
             if self.session.interval in ['15', '30'] and isinstance(plan, RejectionPlan):
