@@ -57,7 +57,7 @@ class BasePlan(ABC):
     
     def __init__(self, session: TradingViewWs, df: pd.DataFrame):
         self.session = session
-        self.df = df
+        self.df = df.copy()
         
     @abstractmethod
     def get_result(self) -> PlanResult:
