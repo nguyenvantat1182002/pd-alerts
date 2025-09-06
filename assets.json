@@ -44,6 +44,16 @@
         "market_open": "4h"
         
     },
+    "EURJPY": {
+        "exchanges": ["OANDA"],
+        "market_open": "4h"
+        
+    },
+    "GBPJPY": {
+        "exchanges": ["OANDA"],
+        "market_open": "4h"
+        
+    },
     "BTCUSDT.P": {
         "exchanges": ["BINANCE"],
         "market_open": "7h"
