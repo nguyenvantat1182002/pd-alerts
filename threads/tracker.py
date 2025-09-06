@@ -123,5 +123,5 @@ class TrackerRunnable(QRunnable):
                 QThread.msleep(1000)
 
     def run(self):
-        self.session.realtime_bar_chart(300, self.handle_candle_update)
+        self.session.realtime_bar_chart(500, self.handle_candle_update)
         
