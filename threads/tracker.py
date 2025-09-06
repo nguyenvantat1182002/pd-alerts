@@ -5,7 +5,6 @@ import pandas as pd
 import talib
 import utils
 
-from collections import defaultdict
 from discord_webhook import DiscordWebhook
 from PyQt5.QtCore import QThread, QRunnable, QThreadPool, QMutex, QMutexLocker
 from tradingview import TradingViewWs
@@ -63,7 +62,6 @@ class TrackerThread(QThread):
         super().__init__()
         self.sessions: queue.Queue[TradingViewWs] = queue.Queue()
         self.mutex = QMutex()
-        self.history: dict[str, dict[str, pd.Timestamp]] = defaultdict(lambda: defaultdict(lambda: None))
         self.pool = QThreadPool()
         self.pool.setMaxThreadCount(999)
         
@@ -106,13 +104,15 @@ class TrackerRunnable(QRunnable):
             identify = f'{self.session.symbol_id}_{timeframe}'
             content = f'Symbol: {self.session.symbol_id}\nTimeframe: {timeframe}\n\n{zone_mapping[result.zone]}'
             
-            previous_signal_time = self.parent.history[identify][plan.name]
-            if previous_signal_time and previous_signal_time == result.base_candle['time']:
-                continue
-            
-            with QMutexLocker(self.parent.mutex):
-                self.parent.history.update({identify: {plan.name: result.base_candle['time']}})
-                
+            previous_signal_time = plan.history.get(identify)
+            if previous_signal_time is not None:
+                if isinstance(plan, PDZonePlan) and previous_signal_time == result.base_candle['time']:
+                    continue
+                elif isinstance(plan, RejectionPlan):
+                    previous_signal_time = plan.history[identify].get(result.zone, None)
+                    if previous_signal_time is not None and previous_signal_time == result.base_candle['time']:
+                        continue
+                    
             webhooks = get_webhooks()
             
             for url in webhooks:
@@ -122,7 +122,13 @@ class TrackerRunnable(QRunnable):
                     traceback.print_exc()
                 
                 QThread.msleep(1000)
-
+                
+            with QMutexLocker(self.parent.mutex):
+                if isinstance(plan, PDZonePlan):
+                    PDZonePlan.history.update({identify: result.base_candle['time']})
+                elif isinstance(plan, RejectionPlan):
+                    RejectionPlan.history.update({identify: {result.zone: result.base_candle['time']}})
+                    
     def run(self):
         self.session.realtime_bar_chart(500, self.handle_candle_update)
         

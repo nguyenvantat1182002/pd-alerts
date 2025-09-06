@@ -57,7 +57,11 @@ class BasePlan(ABC):
     
     def __init__(self, session: TradingViewWs, df: pd.DataFrame):
         self.session = session
-        self.df = df.copy()
+        self.df = df
+
+    def __init_subclass__(cls):
+        super().__init_subclass__()
+        cls.history = {}
         
     @abstractmethod
     def get_result(self) -> PlanResult:
@@ -67,7 +71,7 @@ class PDZonePlan(BasePlan):
     name = 'PDZonePlan'
     
     def __init__(self, session, df):
-        super().__init__(session, df)
+        super().__init__(session, df.copy())
         
     def get_result(self):
         self.df['ST'], self.df['ST_Direction'] = supertrend(self.df['high'], self.df['low'], self.df['close'])
