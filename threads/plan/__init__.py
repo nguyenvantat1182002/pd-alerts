@@ -94,7 +94,7 @@ class RejectionPlan(BasePlan):
     
     def __init__(self, session, df):
         super().__init__(session, df)
-
+        
     def get_result(self):
         _, symbol = self.session.symbol_id.split(':')
         asset = utils.Asset.get(symbol)
@@ -115,30 +115,30 @@ class RejectionPlan(BasePlan):
         result = PlanResult(0, current_candle, False)
         
         for freq in freq_mapping[self.session.interval]:
-            groups = list(self.df.groupby(pd.Grouper(key='time', freq=freq, offset=asset.market_open)).groups.keys())
-            groups = list(map(lambda x: x + pd.Timedelta(days=1, hours=market_open_mapping[asset.market_open]), groups)) if freq == 'W' else groups
+            grouped = list(self.df.groupby(pd.Grouper(key='time', freq=freq, offset=asset.market_open)).groups.keys())
+            if freq == 'W':
+                grouped = list(map(lambda x: x + pd.Timedelta(days=1, hours=market_open_mapping[asset.market_open]), grouped))
+                
+            period_start = grouped[-2 if not freq == 'W' else -3]
+            period_end = grouped[-1 if not freq == 'W' else -2]
+            previous_session_candles = self.df[(self.df['time'] >= period_start) & (self.df['time'] <= period_end)]
             
-            period_start = groups[-2 if not freq == 'W' else -3]
-            period_end = groups[-1 if not freq == 'W' else -2]
-            period_df = self.df[(self.df['time'] >= period_start) & (self.df['time'] <= period_end)]
-
-            first_session_candle = period_df.iloc[-1]
+            current_session_first_candle = previous_session_candles.iloc[-1]
+            current_session_candles = self.df[self.df['time'] >= current_session_first_candle['time']]
             
-            result.base_candle = first_session_candle
+            previous_session_candles = previous_session_candles.head(len(previous_session_candles) - 1)
+            previous_session_high_candle = previous_session_candles.nlargest(1, 'high').iloc[-1]
+            previous_session_low_candle = previous_session_candles.nsmallest(1, 'low').iloc[-1]
             
-            period_df = period_df.head(len(period_df) - 1)
-            previous_high_candle = period_df.nlargest(1, 'high').iloc[-1]
-            previous_low_candle = period_df.nsmallest(1, 'low').iloc[-1]
+            result.base_candle = current_session_first_candle
             
-            current_session_candles = self.df[self.df['time'] >= first_session_candle['time']]
-            
-            if not current_session_candles[current_session_candles['low'] < previous_low_candle['low']].empty \
-                    and current_candle['close'] > first_session_candle['open']:
+            if not current_session_candles[current_session_candles['low'] < previous_session_low_candle['low']].empty \
+                    and current_candle['close'] > current_session_first_candle['open']:
                 result.zone = 1
                 result.result = True
                 result.message = f'Price rejects THE PREVIOUS {freq_mapping[freq]} LOW'
-            elif not current_session_candles[current_session_candles['high'] > previous_high_candle['high']].empty \
-                    and current_candle['close'] < first_session_candle['open']:
+            elif not current_session_candles[current_session_candles['high'] > previous_session_high_candle['high']].empty \
+                    and current_candle['close'] < current_session_first_candle['open']:
                 result.zone = -1
                 result.result = True
                 result.message = f'Price rejects THE PREVIOUS {freq_mapping[freq]} HIGH'
