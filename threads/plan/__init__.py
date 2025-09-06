@@ -53,8 +53,6 @@ class PlanResult:
     message: str = field(default=None)
     
 class BasePlan(ABC):
-    name = 'BasePlan'
-    
     def __init__(self, session: TradingViewWs, df: pd.DataFrame):
         self.session = session
         self.df = df
@@ -68,8 +66,6 @@ class BasePlan(ABC):
         pass
     
 class PDZonePlan(BasePlan):
-    name = 'PDZonePlan'
-    
     def __init__(self, session, df):
         super().__init__(session, df.copy())
         
@@ -94,8 +90,6 @@ class PDZonePlan(BasePlan):
         return result
     
 class RejectionPlan(BasePlan):
-    name = 'RejectionPlan'
-    
     def __init__(self, session, df):
         super().__init__(session, df)
         
