@@ -98,7 +98,7 @@ class TradingViewWs():
         def on_error(ws: WebSocketApp, error: Exception):
             print('Error', error)
             
-
+            
         self.ws = WebSocketApp('wss://data.tradingview.com/socket.io/websocket',
                                header={"Origin": "https://data.tradingview.com"},
                                on_message=on_message,
