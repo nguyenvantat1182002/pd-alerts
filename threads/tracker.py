@@ -2,7 +2,6 @@ import queue
 import os
 import traceback
 import pandas as pd
-import talib
 import utils
 
 from discord_webhook import DiscordWebhook
@@ -20,42 +19,6 @@ def get_webhooks() -> list[str]:
     with open(file_path, encoding='utf-8') as file:
         return file.read().splitlines()
     
-def supertrend(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 10, multiplier: float = 3.0):
-    atr = talib.ATR(high, low, close, timeperiod=period)
-    
-    hl2 = (high + low) / 2
-    upperband = hl2 + multiplier * atr
-    lowerband = hl2 - multiplier * atr
-    
-    final_upperband = upperband.copy()
-    final_lowerband = lowerband.copy()
-
-    for i in range(1, len(close)):
-        if close[i-1] <= final_upperband[i-1]:
-            final_upperband[i] = min(upperband[i], final_upperband[i-1])
-        else:
-            final_upperband[i] = upperband[i]
-            
-        if close[i-1] >= final_lowerband[i-1]:
-            final_lowerband[i] = max(lowerband[i], final_lowerband[i-1])
-        else:
-            final_lowerband[i] = lowerband[i]
-            
-    supertrend = pd.Series(index=close.index, dtype=float)
-    direction = pd.Series(index=close.index, dtype=int)
-    
-    for i in range(period, len(close)):
-        if close[i] > final_upperband[i-1]:
-            direction[i] = 1
-        elif close[i] < final_lowerband[i-1]:
-            direction[i] = -1
-        else:
-            direction[i] = direction[i-1]
-
-        supertrend[i] = final_lowerband[i] if direction[i] == 1 else final_upperband[i]
-
-    return supertrend, direction
-
 
 class TrackerThread(QThread):
     def __init__(self):
